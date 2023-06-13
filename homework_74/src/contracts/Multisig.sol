@@ -11,7 +11,7 @@ contract Multisig {
 
     constructor(address[] memory _admins) {
         adminsCount = _admins.length;
-        for(uint256 i = 0; i < _admins.length; i++) {
+        for(uint256 i = 0; i < adminsCount; i++) {
             admins[_admins[i]] = true;
         }
     }
@@ -35,8 +35,45 @@ contract Multisig {
         uint256 signerCount = _verify(messagehash, v, r, s);
         // проверяем сколько админов подписало сообщение
         require (signerCount > adminsCount / 2, "Not enough signatures");
-        // совершаем низкоуровневый вызов
-        // bool success = lowLevelCall(target, payload, msg.value);
+        // совершаем вызов
+        (bool success,) = target.call(payload);
+        require(success);
+    }
+
+    function _verify(
+        bytes32 messageHash,
+        uint8[] calldata v,
+        bytes32[] calldata r,
+        bytes32[] calldata s
+    ) internal view returns(uint256) {
+        // кол-во админов, которые подписали это сообщение
+        uint256 signed = 0;
+        // массив админов, которые подписали сообщение
+        address[] memory adrs = new address[](v.length);
+        // востанавливаем адреса и считываем сколько там админов 
+        for(uint256 i = 0; i < v.length; i++) {
+            // востонавливаем очередной адрес
+            address adr = ecrecover(messageHash, v[i], r[i], s[i]);
+            // проверяем ест-ли этот адрес среди админов
+            if (admins[adr] == true) {
+                // проверяем нет ли уже этой подписи среди подписавших
+                bool check = true;
+                // перебираем адреса тех, кто уже пописался, 
+                // смотрим есть ли там адрес adr, 
+                // если нет - добавляем
+                for(uint256 j = 0; j < signed; j++) {
+                    if (adrs[i] == adr) {
+                        check = false;
+                        break;
+                    }
+                }
+                if (check) {
+                    adrs[signed] = adr;
+                    signed++;
+                }
+            }
+        }
+        return signed;
     }
 
     // это функция для сборки чуша сщщбщения из исходных данных
@@ -51,60 +88,32 @@ contract Multisig {
         return keccak256(digest);
     }
 
-    function toBytes(uint256 number) internal pure returns(bytes memory) {
-        uint256 temp = number;
-        uint256 digits = 0;
+    // это вариант когда сообщение перед подписью хешируется
+    function getMessageHash2(
+        uint256 _nonce,
+        address target,
+        bytes calldata payload
+    ) internal view returns(bytes32) {
+        bytes32 message = keccak256(abi.encodePacked(_nonce, address(this), target, payload));
+        bytes memory prefix = "\x19Ethereum Signed Messge:\n32";
+        bytes memory digest = abi.encodePacked(prefix, message);
+        return keccak256(digest);
+    }
+    
+    // функция для перевода числа в строку
+    function toBytes(uint256 value) internal pure returns(bytes memory) {
+        uint256 temp = value;
+        uint256 digits;
         do {
-            temp /= 10;
             digits++;
+            temp /= 10;
         } while (temp != 0);
         bytes memory buffer = new bytes(digits);
-        while (number != 0) {
-            digits--;
-            buffer[digits] = bytes1(uint8(48 + uint256(number % 10)));
-            number /= 10;
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
         }
         return buffer;
     }
-
-    function _verify(
-        bytes32 hash,
-        uint8[] calldata v,
-        bytes32[] calldata r,
-        bytes32[] calldata s
-    ) internal view returns(uint256) {
-        // кол-во админов, которые подписали это сообщение
-        uint256 signed = 0;
-        // массив админов, которые подписали сообщение
-        address[] memory adrs = new address[](v.length);
-        for(uint256 i = 0; i < v.length; i++) {
-            // востонавливаем очередной адрес
-            address adr = ecrecover(hash, v[i], r[i], s[i]);
-            // проверяем ест-ли этот адрес среди админов
-            if (admins[adr]) {
-                bool check = true;
-                // перебираем адреса тех, кто уже пописался, 
-                // смотрим есть ли там адрес adr, 
-                // если нет - добавляем
-                for(uint256 j = 0; j < signed; j++) {
-                    if (adr == adrs[j]) {
-                        check = false;
-                        break;
-                    }
-                }
-                if (check) {
-                    adrs[signed] = adr;
-                    signed++;
-                }
-            }
-        }
-        return signed;
-    }
-
-    function lowLevelCall(address target, bytes calldata payload, uint256 value) internal returns(bool) {
-        (bool success, ) = target.call{ value: value }(payload);
-        require(success, "Not successfuly call");
-        return success;
-    }
-
 }
