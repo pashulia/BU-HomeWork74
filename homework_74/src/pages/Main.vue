@@ -13,13 +13,16 @@
             Пользователь админ: {{ $store.state.admin }}
         </div>
     </div>
+    <new-message v-if="$store.state.admin==true && $store.state.newMessage==false"></new-message>
+    <message-for-sign v-if="$store.state.admin==true && $store.state.newMessage==true"></message-for-sign>
+
 </template>
 
 <script>
 import { mapActions } from 'vuex';
 
 export default {
-    method: {
+    methods: {
         ...mapActions({
             connectionWallet: "connectionWallet"
         })

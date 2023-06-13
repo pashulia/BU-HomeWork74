@@ -1,17 +1,19 @@
 import { createStore } from 'vuex';
 
+import { multisigABI } from '@/contracts/Multisig.abi.js';
+
 const ethers = require('ethers');
 
 export default createStore({
     state: {
         provider: {},
-        admins: [],
+        admins: ["0xF86cbd8c36Fded13F403A1676396eCA9b0970587", "0xAa7BA90141352F9Cb3E2a717037984971DFfdaAD", "0xfd301bfd302308eddad20E02DaFfBf0775d5bB31"],
         admin: false,
         address: "",
         chainId: "",
-        multisigAddress: "0x37C44dB964909b6F58aBb209A5e458EdF6C7F614",
+        multisigAddress: "0x256c12bAaB6f6Efcf163f4F7BE6Ae72D1030a5b1",
         multisig: {},
-        // targetAddress: "",
+        // targetAddress: "0x8eb224C938b8482C08b9f7517281D7b96EDA992f",
         // target: {},
         message: {},
         newMessage: false,
@@ -27,6 +29,7 @@ export default createStore({
     },
     actions: {
         async connectionWallet({state}) {
+            //  проверяем, что есть metamask и подключаем его
             if (typeof window.ethereum !== 'undefined') {
                 console.log("Etherium client installed!");
                 if (ethereum.isMetaMask === true) {
@@ -39,7 +42,7 @@ export default createStore({
                 } else {
                     alert ("Metamask is not installed!")
                 }
-            }  else {
+            } else {
                 alert ("Ethereum client is not installed!")
             }
             // подключаем аккаунт
@@ -56,7 +59,7 @@ export default createStore({
             //создаем провайдера
             state.provider = new ethers.providers.Web3Provider(ethereum);
             // state.provider = ethers.getDefaultProvider(ethereum);
-            console.log(state.provider);
+            // console.log(state.provider);
             // получаем параметры сети
             state.chainId = await window.ethereum.request({ method: "eth_chainId" });
             console.log("chainId: ", state.chainId);
@@ -81,20 +84,23 @@ export default createStore({
         },
         async newMessage({state}, args) {
             const [targetAddress, functionName, functionArgs] = args;
+            console.log(targetAddress);
+            console.log(functionName);
+            console.log(functionArgs);
             // functionArgs = {
             //     types: [],
             //     args: []
             // }
             // собираем сигнатуру целевой функции
-            const functionSignature = "function " + functionName + "(";
-            for(let i = 0; i < functionSignature.types.length; i++) {
-                functionSignature += functionSignature.types[i] + ",";
+            let functionSignature = "function " + functionName + "(";
+            for(let i = 0; i < functionArgs.types.length; i++) {
+                functionSignature += functionArgs.types[i] + ",";
             }
-            functionSignature += functionSignature.slice(0, -1) + ")";
+            functionSignature = functionSignature.slice(0, -1) + ")";
             console.log("functionSignature: ", functionSignature);
 
             // собираем интерфейс целевого контракта
-            const iTarget = ethers.utils.Interface([functionSignature]);
+            const iTarget = new ethers.utils.Interface([functionSignature]);
             console.log("iTarget: ", iTarget);
 
             // Собираем calldata
@@ -186,6 +192,7 @@ export default createStore({
                 state.message.signatures.r,
                 state.message.signatures.s
             ]);
+            // отправляем транзакцию
             const txHash = await window.ethereum.request({
                 method: "eth_transaction",
                 params: [{
@@ -201,7 +208,7 @@ export default createStore({
             const receipt = await provider.waitForTransaction(txHash);
             console.log("receipt: ", receipt);
 
-            const target = new ethers.Contract(state.message.targetAddress, state.targetAddress, state.targetABI, provider);
+            const target = new ethers.Contract(state.message.targetAddress, state.targetAbi, provider);
             const number = await target.number();
             console.log("number: ", number);
 
