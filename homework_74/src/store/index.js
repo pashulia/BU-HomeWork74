@@ -1,8 +1,10 @@
 import { createStore } from 'vuex';
 
 import { multisigABI } from '@/contracts/Multisig.abi.js';
+import { targetABI } from '@/contracts/Target.abi.js';
 
 const ethers = require('ethers');
+const jsprovider = new ethers.providers.JsonRpcProvider("https://eth-goerli.g.alchemy.com/v2/XdE1v9zVDSoRe6S5013cteykw1ZDC0u9");
 
 export default createStore({
     state: {
@@ -13,7 +15,7 @@ export default createStore({
         chainId: "",
         multisigAddress: "0x256c12bAaB6f6Efcf163f4F7BE6Ae72D1030a5b1",
         multisig: {},
-        // targetAddress: "0x8eb224C938b8482C08b9f7517281D7b96EDA992f",
+        // targetAddress: "0xddaD96F0978F7757A8A66a6a312C2517b98A3331",
         // target: {},
         message: {},
         newMessage: false,
@@ -104,22 +106,22 @@ export default createStore({
             console.log("iTarget: ", iTarget);
 
             // Собираем calldata
-            const payload = iTarget.encodeFunctionData(functionName, functionArgs.values);
+            const payload = iTarget.encodeFunctionData(functionName, functionArgs.args);
             console.log("payload: ", payload);
 
             // Получаем nonce
             // Для начала получаем провайдера и инстанс контракта
-            const provider = ethers.getDefaultProvider(ethers.BigNumber.from(state.chainId).toNumber());
-            state.multisig = new ethers.Contract(state.multisigAddress, multisigABI, provider);
+            // const provider = ethers.getDefaultProvider(ethers.BigNumber.from(state.chainId).toNumber());
+            state.multisig = new ethers.Contract(state.multisigAddress, multisigABI, jsprovider);
             const nonce = await state.multisig.nonce();
-            console.log(nonce);
+            console.log("nonce: ", nonce);
 
             // Собираем сообщение
-            const message = ethers.utils.arrayify(ethers.utils.silidityPack(
+            const message = ethers.utils.arrayify(ethers.utils.solidityPack(
                 ["uint256", "address", "address", "bytes"],
                 [nonce, state.multisigAddress, targetAddress, payload]
             ));
-            console.log("message: ", message);
+            // console.log("message: ", message);
 
             // получаем подписанта
             const signer = state.provider.getSigner();
@@ -171,13 +173,13 @@ export default createStore({
             state.message.signatures.v.push(signature.v);
             state.message.signatures.r.push(signature.r);
             state.message.signatures.s.push(signature.s);
-            state.message.signers.push(signer.address);
+            state.message.signers.push(state.address);
 
             console.log("New sign: ", signer.address);
             console.log("Sign count: ", state.message.signers.length);
             if(state.message.signers.length > state.admins.length / 2) {
                 console.log("enough signatures");
-                ethers.enoughSignatures = true;
+                state.enoughSignatures = true;
             }
         },
         async sendMessage({state}) {
@@ -194,7 +196,7 @@ export default createStore({
             ]);
             // отправляем транзакцию
             const txHash = await window.ethereum.request({
-                method: "eth_transaction",
+                method: "eth_sendTransaction",
                 params: [{
                     from: state.address,
                     to: state.multisigAddress,
@@ -204,11 +206,11 @@ export default createStore({
             console.log("txHash: ", txHash);
 
             // ждём квитанцию
-            const provider = ethers.getDefaultProvider(ethers.BigNumber.from(state.chainId).toNumber())
-            const receipt = await provider.waitForTransaction(txHash);
+            // const provider = ethers.getDefaultProvider(ethers.BigNumber.from(state.chainId).toNumber())
+            const receipt = await jsprovider.waitForTransaction(txHash);
             console.log("receipt: ", receipt);
 
-            const target = new ethers.Contract(state.message.targetAddress, state.targetAbi, provider);
+            const target = new ethers.Contract(state.message.targetAddress, targetABI, jsprovider);
             const number = await target.number();
             console.log("number: ", number);
 
