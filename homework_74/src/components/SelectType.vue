@@ -1,6 +1,6 @@
 <template>
-    <div>"Это форма для ввода" аргумента</div>
-    <select @change="changeOption">
+    {{ id }}
+    <select class="sel" @change="changeOption">
         <option value="">Выберите тип данных</option>
         <option v-for="option in options">{{ option }}</option>
     </select>
@@ -26,5 +26,16 @@ export default {
 </script>
 
 <style>
-
+    * {
+        padding: 0;
+        margin: 0;
+        box-sizing: border-box;
+    }
+    .sel {
+        padding: 15px;
+        margin-top: 5px;
+        border: 2px solid black;
+        background-color: #d6d4d4;
+        border-radius: 5px;
+    }
 </style>
